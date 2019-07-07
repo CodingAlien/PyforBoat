@@ -9,5 +9,3 @@ CMP(used to find accelerometer, gyroscope and bearings)
 RTC(Used to keep the correct data and time whilst the power is off)
 GPS adafruit breakout board(Used to find exact gps location and latitude and longitude)
 
-Please credit me for this code
-
