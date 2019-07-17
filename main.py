@@ -12,6 +12,7 @@ import threading
 import component_tests
 
 
+
 class MoExample(rockBlockProtocol):
   def __init__(self):
       self.rb = rockBlock.rockBlock("/dev/ttyUSB1", self)
@@ -42,6 +43,22 @@ def smbus_setup():
             break                 #in which case a manual fix is necessary
         else:
             break #pass
+
+class Timer: # This is a timer class which simplifies having to do anything at certain intervals
+    def __init__(self, toexecute, delay): #This can easiliy be reused
+        self.function = toexecute
+        self.wait = delay
+        self.thread1 = threading.Thread(target=(self.loop)) # allows creation of multiple threads running simultaneously
+        self.running = True
+    def loop(self):
+        while self.running:
+            time.sleep(self.wait)
+            self.function()
+    def start(self):
+        self.thread1.start()
+    def stop(self):
+        self.runnning = False
+
 
 run_gps = True
 
@@ -133,23 +150,24 @@ class map:
 
 def read_cmp():
     start = time.time()
-    while 1:
-        time.sleep(0.01)
-        bearing = float(bus.read_byte_data(0x60, 0x01)) * 360/255
-        acc_z = bus.read_byte_data(0x60, 0x10)
-
-        if bearing == float(bus.read_byte_data(0x60, 0x01)) and acc_z == bus.read_byte_data(0x60, 0x10):
-            break #breaks out the loop since the bearing and acceleration is correct
-        else:
-            trace = traceback.format_exc() # allows to forward the error message back to via email ?
-            rb.sendMessage(trace) # todo I cant remember the code for this..
-
-            time.sleep(30)
-            continue  #this causes the function to run again
+    #while 1:
+    time.sleep(0.1)
+    bus = SMBus(1)
+    bearing = float(bus.read_byte_data(0x60, 0x01)) * 360/255
+    acc_z = bus.read_byte_data(0x60, 0x10)
+        #if bearing == float(bus.read_byte_data(0x60, 0x01)) and acc_z == bus.read_byte_data(0x60, 0x10):
+        #    break #breaks out the loop since the bearing and acceleration is correct
+        #else:
+        #    trace = traceback.format_exc() # allows to forward the error message back to via email ?
+        #    #rb.sendMessage(trace) # todo I cant remember the code for this..#
+#
+  #          time.sleep(5)
+ #           continue  #this causes the function to run again
                       #if you want the file to start again, something else needs to done
 
 
     cal_state = bus.read_byte_data(0x060, 0x1E)
+    bus.close()
     # bearing_l = bus.read_byte_data(0x60, 0x03)
     # bearing_h = bus.read_byte_data(0x60, 0x02)
     end = time.time() - start
@@ -157,14 +175,14 @@ def read_cmp():
 
 def read_gps():
     start = time.time()
-    while 1:
-        time.sleep(0.1)
+    time.sleep(0.1)
+    while True:
         try:
-          session = gps.gps("localhost", "2947")
-          session.stream(gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE)
-          break
+            session = gps.gps("localhost", "2947")
+            session.stream(gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE)
+            break
         except:
-          return 0, 0#pass
+            pass
     hasLat = hasLong = 0
     while ((hasLat==0) or (hasLong==0)):
         report = session.next()
@@ -175,11 +193,10 @@ def read_gps():
         if report['class'] == 'TPV':
           if hasattr(report, 'lat'):
             hasLong = 1
-            lat_int = report
+            lat_int = report.lat
     #GPIO.output[] # todo This is for the LED lightining, so when hasLat and hasLong is fetched the LED outputs whatever
     end = time.time() - start # how it took to get the values, this can be returned and transmitted.
     return lat_int, lon_int
-
 
 #if __name__ == '__main__':.
 
@@ -206,34 +223,55 @@ movementBearing = 0
 trans_data = ""
 
 def check_lopsided():
-    compassBearing, acc_z = read_cmp()
-    if acc_z >= 128:
-        upsideDown = 0
-    else:
-        upsideDown = 1
-    updateMotors(pinlist, compassBearing, movementBearing, upsideDown)
-    return upsideDown
+    cmp_timer = Timer(check_lopsided, delay=2)
+
+    cmp_timer.start()
+
+    while True:
+        compassBearing, acc_z = read_cmp()
+        if acc_z >= 128:
+            upsideDown = 0
+        else:
+            upsideDown = 1
+        updateMotors(pinlist, compassBearing, movementBearing, upsideDown)
+        return upsideDown
+
+    cmp_timer.stop()
+
 
 def run_gps():
-    latt, longi = read_gps()
+    gps_timer = Timer(read_gps, delay=60)
 
-    movementBearing = map.mapReader(latt, longi, array)
+    gps_timer.start()
+    while True:
+        latt, longi = read_gps()
 
+        movementBearing = map.mapReader(latt, longi, array)
+
+    gps_timer.stop()
 
 
 def location_repo():
-    read_gps()
-    long_repo *= 1000
-    long_repo = round(long_repo, 0)
+    location_timer = Timer(read_gps, delay=1800)
+    location_timer.start()
 
-    latitude_repo *= 1000
-    latitude_repo = round(latitude_repo, 0)
+    while True:
+        long_repo *= 1000
+        long_repo = round(long_repo, 0)
 
-    # This is converting into 15 bit binary number and adding it the the list
-    trans_data.append('{0:015b}'.format(long_repo))
-    trans_data.append('{0:015b}'.format(latitude_repo))
+        latitude_repo *= 1000
+        latitude_repo = round(latitude_repo, 0)
+
+        # This is converting into 15 bit binary number and adding it the the list
+        trans_data.append('{0:015b}'.format(long_repo))
+        trans_data.append('{0:015b}'.format(latitude_repo))
+
+    location_timer.stop()
 
 def message_sent():
+
+    message_timer = Timer()
+
     GPIO.output(pinList[0], 0)
     RB = MoExample()
     if RB.passed == 1:
@@ -245,23 +283,21 @@ def message_sent():
     return time_tomessage
 
 
+location_timer =
 
-if __name__ == "__main__":
-    read_gps()
-    read_cmp()
+if location_timer.running() and message_timer.running() and gps_timer.running()
 
-    cmp_timer = Timer(check_lopsided(), delay=2)
-    gps_timer = Timer(run_gps(), delay=60)
+    # read_gps()
+    # read_cmp()
+    #
     location_timer = Timer(location_repo(), delay=1800)
     message_timer = Timer(message_sent(), delay = message_sent())
-
-
+    #
+    #
     gps_timer.start()
-    cmp_timer.start()
     location_timer.start()
     message_timer.start()
-
-    cmp_timer.stop()
+    #
     gps_timer.stop()
     location_timer.stop()
     message_timer.stop()
