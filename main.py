@@ -1,39 +1,38 @@
 import gps
-import rockBlock
-from rockBlock import rockBlockProtocol
+#import rockBlock
+#from rockBlock import rockBlockProtocol
 import smbus
 from smbus import SMBus
 import time
 import datetime
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
 import traceback
-import _thread
 import threading
-import component_tests
+#import component_tests
 
 
 
-class MoExample(rockBlockProtocol):
-  def __init__(self):
-      self.rb = rockBlock.rockBlock("/dev/ttyUSB1", self)
-  def main(self):
-
-    # rb = rockBlock.rockBlock("/dev/ttyUSB1", self)
-    
-    #print("Hello World")
-    self.rb.sendMessage("Hello World RockBLOCK!")
-
-    self.rb.close()
-
-  def rockBlockTxStarted(self):
-    pass#print "rockBlockTxStarted"
-
-  def rockBlockTxFailed(self):
-    pass#print "rockBlockTxFailed"
-
-  def rockBlockTxSuccess(self,momsn):
-    #global passed, variable array <- you cant use globals in classes
-    print("rockBlockTxSuccess ") + str(momsn)
+# class MoExample(rockBlockProtocol):
+#   def __init__(self):
+#       self.rb = rockBlock.rockBlock("/dev/ttyUSB1", self)
+#   def main(self):
+#
+#     # rb = rockBlock.rockBlock("/dev/ttyUSB1", self)
+#
+#     #print("Hello World")
+#     self.rb.sendMessage("Hello World RockBLOCK!")
+#
+#     self.rb.close()
+#
+#   def rockBlockTxStarted(self):
+#     pass#print "rockBlockTxStarted"
+#
+#   def rockBlockTxFailed(self):
+#     pass#print "rockBlockTxFailed"
+#
+#   def rockBlockTxSuccess(self,momsn):
+#     #global passed, variable array <- you cant use globals in classes
+#     print("rockBlockTxSuccess ") + str(momsn)
 
 def smbus_setup():
     while True:
@@ -62,20 +61,20 @@ class Timer: # This is a timer class which simplifies having to do anything at c
 
 run_gps = True
 
-GPIO.setmode(GPIO.BCM)
+#GPIO.setmode(GPIO.BCM)
 
-fileName = "Coloured abbey fields - (52.349527, -1.587642), (52.347117, -1.583197) text"
-
-file1 = open("/home/pi/Desktop/"+fileName+".txt","r")
-
-
-f = file1.read() #opens and reads the file containing the map into an array
-array = []
-for x in f.split("\n")[:-1]:
-  yArr = []
-  for y in x.split(",")[:-1]:
-    yArr.append(y)
-  array.append(yArr)
+# fileName = "Coloured abbey fields - (52.349527, -1.587642), (52.347117, -1.583197) text"
+#
+# file1 = open("/home/pi/Desktop/"+fileName+".txt","r")
+#
+#
+# f = file1.read() #opens and reads the file containing the map into an array
+# array = []
+# for x in f.split("\n")[:-1]:
+#   yArr = []
+#   for y in x.split(",")[:-1]:
+#     yArr.append(y)
+#   array.append(yArr)
 
 #pinList is a list of 7 GPIO pin numbers to be used
 #movementBearing is the direction it should move in
@@ -152,9 +151,9 @@ def read_cmp():
     start = time.time()
     #while 1:
     time.sleep(0.1)
-    bus = SMBus(1)
-    bearing = float(bus.read_byte_data(0x60, 0x01)) * 360/255
-    acc_z = bus.read_byte_data(0x60, 0x10)
+    # bus = SMBus(1)
+    # bearing = float(bus.read_byte_data(0x60, 0x01)) * 360/255
+    # acc_z = bus.read_byte_data(0x60, 0x10)
         #if bearing == float(bus.read_byte_data(0x60, 0x01)) and acc_z == bus.read_byte_data(0x60, 0x10):
         #    break #breaks out the loop since the bearing and acceleration is correct
         #else:
@@ -166,12 +165,12 @@ def read_cmp():
                       #if you want the file to start again, something else needs to done
 
 
-    cal_state = bus.read_byte_data(0x060, 0x1E)
-    bus.close()
+    # cal_state = bus.read_byte_data(0x060, 0x1E)
+    # bus.close()
     # bearing_l = bus.read_byte_data(0x60, 0x03)
     # bearing_h = bus.read_byte_data(0x60, 0x02)
     end = time.time() - start
-    return bearing, acc_z, cal_state
+    #return bearing, acc_z, cal_state
 
 def read_gps():
     start = time.time()
@@ -204,7 +203,7 @@ class Timer: # This is a timer class which simplifies having to do anything at c
     def __init__(self, toexecute, delay): #This can easiliy be reused
         self.function = toexecute
         self.wait = delay
-        self.thread = threading.Thread(self.loop) # allows creation of multiple threads running simultaneously
+        self.thread = threading.Thread(target=self.loop) # allows creation of multiple threads running simultaneously
         self.running = True
     def loop(self):
         while self.running:
@@ -215,62 +214,55 @@ class Timer: # This is a timer class which simplifies having to do anything at c
     def stop(self):
         self.runnning = False
 
-pinList = [17,27,22,10,9,11,5]
-for pin in pinList:
-  GPIO.setup(pin,GPIO.OUT)
+# pinList = [17,27,22,10,9,11,5]
+# for pin in pinList:
+#   GPIO.setup(pin,GPIO.OUT)
 
 movementBearing = 0
-trans_data = ""
+trans_data = []
 
 def check_lopsided():
     cmp_timer = Timer(check_lopsided, delay=2)
 
     cmp_timer.start()
 
-    while True:
-        compassBearing, acc_z = read_cmp()
-        if acc_z >= 128:
-            upsideDown = 0
-        else:
-            upsideDown = 1
-        updateMotors(pinlist, compassBearing, movementBearing, upsideDown)
-        return upsideDown
+    compassBearing, acc_z = read_cmp()
+    if acc_z >= 128:
+        upsideDown = 0
+    else:
+        upsideDown = 1
+    updateMotors(pinlist, compassBearing, movementBearing, upsideDown)
+    return upsideDown
 
-    cmp_timer.stop()
 
 
 def run_gps():
     gps_timer = Timer(read_gps, delay=60)
 
-    gps_timer.start()
-    while True:
-        latt, longi = read_gps()
 
-        movementBearing = map.mapReader(latt, longi, array)
+    latt, longi = read_gps()
 
-    gps_timer.stop()
+    movementBearing = map.mapReader(latt, longi, array)
+
 
 
 def location_repo():
-    location_timer = Timer(read_gps, delay=1800)
-    location_timer.start()
+    long_repo = 0
+    latitude_repo = 0
+    long_repo *= 1000
+    long_repo = round(long_repo, 0)
 
-    while True:
-        long_repo *= 1000
-        long_repo = round(long_repo, 0)
+    latitude_repo *= 1000
+    latitude_repo = round(latitude_repo, 0)
 
-        latitude_repo *= 1000
-        latitude_repo = round(latitude_repo, 0)
+    # This is converting into 15 bit binary number and adding it the the list
+    trans_data.append('{0:015b}'.format(long_repo))
+    trans_data.append('{0:015b}'.format(latitude_repo))
+    print("location_repo")
 
-        # This is converting into 15 bit binary number and adding it the the list
-        trans_data.append('{0:015b}'.format(long_repo))
-        trans_data.append('{0:015b}'.format(latitude_repo))
-
-    location_timer.stop()
 
 def message_sent():
 
-    message_timer = Timer()
 
     GPIO.output(pinList[0], 0)
     RB = MoExample()
@@ -282,27 +274,22 @@ def message_sent():
     GPIO.output(pinList[0], 1)
     return time_tomessage
 
+location_timer = Timer(location_repo, delay = 5)
+message_timer = Timer(message_sent, delay = 10)
+gps_timer = Timer(run_gps, delay = 20)
 
-location_timer =
+location_timer.start()
+message_timer.start()
+gps_timer.start()
 
-if location_timer.running() and message_timer.running() and gps_timer.running()
+print("Running...")
 
-    # read_gps()
-    # read_cmp()
-    #
-    location_timer = Timer(location_repo(), delay=1800)
-    message_timer = Timer(message_sent(), delay = message_sent())
-    #
-    #
-    gps_timer.start()
-    location_timer.start()
-    message_timer.start()
-    #
-    gps_timer.stop()
-    location_timer.stop()
-    message_timer.stop()
-
-
-
-    #whatever else you want to go on forever
+location_timer.stop()
+message_timer.stop()
+gps_timer.stop()
+#
+#
+while location_timer.running and message_timer.running and gps_timer.running:
+    pass
+#
 
